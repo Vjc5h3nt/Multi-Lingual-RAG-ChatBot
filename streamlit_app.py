@@ -9,6 +9,7 @@ from app.embedder import BedrockEmbedder
 from app.vector_store import FaissVectorStore
 from app.rag_pipeline import RAGPipeline
 from app.models import Document
+from app.language import get_language_label, resolve_target_language
 
 # Initialize LangSmith for backend analytics
 from dotenv import load_dotenv
@@ -146,6 +147,32 @@ INDEX_PATH = "data/index/faiss.index"
 DOCS_PATH = "data/index/documents.pkl"
 RAW_DATA_DIR = "data/raw"
 INDEX_DIR = "data/index"
+DEFAULT_OCR_LANGUAGES = (
+    "eng",
+    "hin",
+    "tel",
+    "tam",
+    "rus",
+    "ukr",
+    "por",
+    "spa",
+    "fra",
+    "deu",
+    "ita",
+)
+OCR_LANGUAGE_LABELS = {
+    "eng": "English",
+    "hin": "Hindi",
+    "tel": "Telugu",
+    "tam": "Tamil",
+    "rus": "Russian",
+    "ukr": "Ukrainian",
+    "por": "Portuguese",
+    "spa": "Spanish",
+    "fra": "French",
+    "deu": "German",
+    "ita": "Italian",
+}
 
 
 def ensure_data_directories():
@@ -180,10 +207,32 @@ def save_uploaded_pdfs(uploaded_files) -> List[str]:
     return saved_files
 
 
-def build_vector_store(show_progress: bool = False, force_ocr: bool = False):
+def get_available_ocr_languages() -> List[str]:
+    try:
+        import pytesseract
+
+        installed = pytesseract.get_languages(config="")
+        filtered = [code for code in installed if code in OCR_LANGUAGE_LABELS]
+        if filtered:
+            return sorted(filtered)
+    except Exception:
+        pass
+
+    return list(DEFAULT_OCR_LANGUAGES)
+
+
+def format_ocr_language_option(code: str) -> str:
+    return f"{OCR_LANGUAGE_LABELS.get(code, code)} ({code})"
+
+
+def build_vector_store(
+    show_progress: bool = False,
+    force_ocr: bool = False,
+    ocr_languages: Tuple[str, ...] = DEFAULT_OCR_LANGUAGES,
+):
     ensure_data_directories()
     embedder = BedrockEmbedder()
-    loader = PDFLoader(force_ocr=force_ocr)
+    loader = PDFLoader(force_ocr=force_ocr, ocr_languages=list(ocr_languages))
     chunker = TextChunker(chunk_size=200, overlap=20)
 
     all_docs = []
@@ -225,7 +274,10 @@ def build_vector_store(show_progress: bool = False, force_ocr: bool = False):
     return vector_store
 
 @st.cache_resource
-def load_vector_store(force_ocr: bool = False):
+def load_vector_store(
+    force_ocr: bool = False,
+    ocr_languages: Tuple[str, ...] = DEFAULT_OCR_LANGUAGES,
+):
     """Load or build the FAISS vector store"""
     ensure_data_directories()
 
@@ -234,7 +286,11 @@ def load_vector_store(force_ocr: bool = False):
         vector_store.load(INDEX_PATH, DOCS_PATH)
         return vector_store
 
-    return build_vector_store(show_progress=True, force_ocr=force_ocr)
+    return build_vector_store(
+        show_progress=True,
+        force_ocr=force_ocr,
+        ocr_languages=ocr_languages,
+    )
 
 def get_answer_with_context(rag: RAGPipeline, question: str, top_k: int = 10, max_tokens: int = 500, temperature: float = 0.3) -> Tuple[str, List[Document]]:
     """Get answer and retrieved context"""
@@ -246,24 +302,43 @@ def get_answer_with_context(rag: RAGPipeline, question: str, top_k: int = 10, ma
     retrieved_docs = rag.vector_store.search(query_embedding, top_k=top_k)
     
     context = "\n\n".join([doc.content for doc in retrieved_docs])
+    target_language_code, target_language_reason = resolve_target_language(question)
+    target_language_label = get_language_label(target_language_code)
     
     prompt = f"""You are a multilingual knowledge assistant with STRICT grounding requirements.
 
+TARGET RESPONSE LANGUAGE: {target_language_label} ({target_language_code})
+LANGUAGE SELECTION REASON: {target_language_reason}
+
+FINAL LANGUAGE REQUIREMENT:
+- Your entire answer MUST be written in {target_language_label}
+- Do not answer in the Context language unless {target_language_label} is also the target language
+- If the Context is in another language, translate the relevant information into {target_language_label}
+
 ⚠️ CRITICAL RULES:
 1. MULTILINGUAL CONTEXT HANDLING:
-   - The Context below may be in ANY language (English, Telugu తెలుగు, Hindi हिंदी, French, Arabic, etc.)
+   - The Context below may be in ANY language, including major European languages plus Indian and other widely used languages
    - You MUST read, understand, and USE the Context regardless of what language it's written in
    - If Context language ≠ Response language, you MUST translate the information
-   - Use NATIVE SCRIPT for target language (देवनागरी for Hindi, తెలుగు for Telugu, etc.)
+   - Use NATIVE SCRIPT for target language (for example: Devanagari for Hindi, తెలుగు for Telugu, தமிழ் for Tamil, Cyrillic for Russian/Ukrainian, etc.)
    
 2. RESPONSE LANGUAGE PRIORITY:
-   - FIRST: Check if Question explicitly requests a language (e.g., "in French", "en español", "हिंदी में")
+   - FIRST: Check if the Question explicitly requests a language (e.g., "in French", "en español", "हिंदी में")
      → If yes, answer in that requested language
-   - SECOND: If no explicit language request, detect the Question's language and answer in that language
+   - SECOND: If no explicit language is requested, answer in the dominant language used by the user in the full Question
+   - For mixed-language Questions, choose the language that represents most of the sentence
+   - A short greeting or a few words in another language should NOT override the dominant language of the full Question
+   - Determine the response language from the user's Question ONLY, never from the Context language
+   - If the Question is in English, the answer MUST be fully in English unless the user explicitly requests another language
+   - NEVER switch to Hindi, Telugu, or any other Context language unless the user explicitly asks for that language
+   - DO NOT maintain or fall back to any default language
    - Examples:
      * "Tell me about X in French" → Answer in French (explicit request)
-     * "क्या आपके पास जानकारी है?" → Answer in Hindi (query language)
-     * "Do you have information?" → Answer in English (query language)
+     * "क्या आपके पास जानकारी है?" → Answer in Hindi (same language as the user)
+     * "Do you have information?" → Answer in English (same language as the user)
+     * "Привіт, how is it going?" → Answer in English because most of the sentence is English
+     * "Привіт, how is it going? Reply in Ukrainian." → Answer in Ukrainian because the user explicitly requested it
+     * English Question + Hindi Context → Answer in English by translating the retrieved Hindi information
    
 3. GROUNDING: Answer using ONLY information from the Context below
 
@@ -275,17 +350,23 @@ def get_answer_with_context(rag: RAGPipeline, question: str, top_k: int = 10, ma
 5. DO NOT use external knowledge beyond what's in the Context
 
 YOUR PROCESS:
-Step 1: Check if Question explicitly requests a specific language
-Step 2: If yes, use that language; if no, use the Question's language
-Step 3: Read and understand the Context (regardless of its language)
-Step 4: Extract the relevant information that answers the Question
-Step 5: Translate that information to the target language (from Step 1-2)
-Step 6: Provide the COMPLETE answer in the target language with native script
+Step 1: Check if the Question explicitly requests a specific language
+Step 2: If yes, use that language; if no, identify the dominant language of the user's full Question and respond in that language
+Step 3: Ignore the Context language when deciding the answer language
+Step 4: Read and understand the Context (regardless of its language)
+Step 5: Extract the relevant information that answers the Question
+Step 6: Translate that information to the target language (from Step 1-2)
+Step 7: Provide the COMPLETE answer in the target language with native script
 
 EXAMPLES:
 ✓ "Boy who cried wolf in French" → Full answer in Français
 ✓ Question in हिंदी → Full answer in हिंदी (even if Context is in తెలుగు)
 ✓ Question in English (no language request) → Full answer in English
+✓ User asks in Telugu → Full answer in Telugu unless another language is explicitly requested
+✓ Mixed question with mostly English text → Full answer in English unless another language is explicitly requested
+✓ Portuguese Question + Hindi Context → Full answer in Portuguese
+✓ Russian Question + English Context → Full answer in Russian
+✓ German Question + Hindi Context → Full answer in German
 
 Context:
 {context}
@@ -415,16 +496,30 @@ def main():
             value=False,
             help="Use OCR even when the PDF already contains an extracted text layer."
         )
+        available_ocr_languages = get_available_ocr_languages()
+        default_ocr_languages = [
+            code for code in DEFAULT_OCR_LANGUAGES if code in available_ocr_languages
+        ] or available_ocr_languages[:3]
+        selected_ocr_languages = st.multiselect(
+            "OCR languages",
+            options=available_ocr_languages,
+            default=default_ocr_languages,
+            format_func=format_ocr_language_option,
+            help="These Tesseract languages are used only when OCR runs during ingestion."
+        )
         uploaded_files = st.file_uploader(
             "Upload PDF documents",
             type=["pdf"],
             accept_multiple_files=True,
             help="Uploaded PDFs are saved to data/raw and re-indexed into the vector database."
         )
+        selected_ocr_languages_tuple = tuple(selected_ocr_languages or default_ocr_languages)
 
         if st.button("📥 Upload & Ingest Documents", use_container_width=True):
             if not uploaded_files:
                 st.warning("Select at least one PDF file to upload.")
+            elif not selected_ocr_languages_tuple:
+                st.warning("Select at least one OCR language.")
             else:
                 try:
                     saved_files = save_uploaded_pdfs(uploaded_files)
@@ -432,7 +527,11 @@ def main():
                     clear_cached_rag()
                     with st.spinner("Uploading files and rebuilding the vector database..."):
                         st.session_state.rag = RAGPipeline(
-                            build_vector_store(show_progress=True, force_ocr=force_ocr)
+                            build_vector_store(
+                                show_progress=True,
+                                force_ocr=force_ocr,
+                                ocr_languages=selected_ocr_languages_tuple,
+                            )
                         )
                     st.success(
                         f"Uploaded {len(saved_files)} file(s) and rebuilt the vector database."
@@ -454,6 +553,9 @@ def main():
                 st.error(f"Failed to delete vector database files: {exc}")
 
         st.caption("Deleting the vector DB removes only indexed data in data/index. Source PDFs in data/raw are kept.")
+        st.caption(
+            "OCR uses the selected Tesseract language packs when OCR is triggered or forced."
+        )
 
         st.markdown("---")
         
@@ -464,11 +566,9 @@ def main():
         
         st.markdown("### 🌍 Supported Languages")
         st.markdown("""
-        - 🇮🇳 Telugu
-        - 🇮🇳 Hindi
-        - 🇬🇧 English
-        - 🇫🇷 French
-        - And many more...
+        - European languages such as English, French, German, Spanish, Portuguese, Italian, Russian, Ukrainian, and more
+        - Indian languages such as Hindi, Telugu, Tamil, and more
+        - Arabic and other widely used languages
         """)
         
         st.markdown("---")
@@ -483,7 +583,10 @@ def main():
     if "rag" not in st.session_state:
         try:
             with st.spinner("🔄 Loading vector store and initializing RAG pipeline..."):
-                vector_store = load_vector_store(force_ocr=force_ocr)
+                vector_store = load_vector_store(
+                    force_ocr=force_ocr,
+                    ocr_languages=selected_ocr_languages_tuple,
+                )
                 st.session_state.rag = RAGPipeline(vector_store)
         except FileNotFoundError:
             st.info("Upload PDFs from the sidebar to build the knowledge base.")

@@ -15,3 +15,4 @@ pytesseract==0.3.13
 Pillow==11.3.0
 streamlit==1.50.0
 langsmith
+langdetect

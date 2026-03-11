@@ -1,12 +1,29 @@
 import unicodedata
-from typing import List
+from typing import List, Optional
 from pypdf import PdfReader
 from app.loaders.base_loader import BaseLoader
 from app.models import Document
 
+
+DEFAULT_OCR_LANGUAGES = [
+    "eng",
+    "hin",
+    "tel",
+    "tam",
+    "rus",
+    "ukr",
+    "por",
+    "spa",
+    "fra",
+    "deu",
+    "ita",
+]
+
+
 class PDFLoader(BaseLoader):
-    def __init__(self, force_ocr: bool = False):
+    def __init__(self, force_ocr: bool = False, ocr_languages: Optional[List[str]] = None):
         self.force_ocr = force_ocr
+        self.ocr_languages = ocr_languages or DEFAULT_OCR_LANGUAGES
 
     def load(self, file_path: str) -> List[Document]:
         reader = PdfReader(file_path)
@@ -46,7 +63,10 @@ class PDFLoader(BaseLoader):
 
         if should_run_ocr:
             reason = "force_ocr=True" if self.force_ocr else "weak extracted text detected"
-            print(f"[OCR] {reason} for: {file_path}. Running OCR...")
+            print(
+                f"[OCR] {reason} for: {file_path}. Running OCR with languages: "
+                f"{'+'.join(self.ocr_languages)}"
+            )
             documents = self._ocr_pdf(file_path)
 
         return documents
@@ -83,6 +103,8 @@ class PDFLoader(BaseLoader):
         import pytesseract
         import platform
 
+        ocr_language_string = "+".join(self.ocr_languages)
+
         # Platform-specific paths
         if platform.system() == "Windows":
             # Explicit paths for Windows installation
@@ -104,7 +126,7 @@ class PDFLoader(BaseLoader):
         docs: List[Document] = []
 
         for i, img in enumerate(pages):
-            text = pytesseract.image_to_string(img, lang="eng+tel+hin")
+            text = pytesseract.image_to_string(img, lang=ocr_language_string)
             if text and text.strip():
                 docs.append(
                     Document(
@@ -112,7 +134,8 @@ class PDFLoader(BaseLoader):
                         metadata={
                             "source": file_path,
                             "page": i + 1,
-                            "ocr": True
+                            "ocr": True,
+                            "ocr_languages": self.ocr_languages,
                         }
                     )
                 )
