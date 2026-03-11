@@ -1,15 +1,19 @@
+import unicodedata
 from typing import List
 from pypdf import PdfReader
 from app.loaders.base_loader import BaseLoader
 from app.models import Document
 
 class PDFLoader(BaseLoader):
+    def __init__(self, force_ocr: bool = False):
+        self.force_ocr = force_ocr
 
     def load(self, file_path: str) -> List[Document]:
         reader = PdfReader(file_path)
         documents: List[Document] = []
 
         empty_pages = 0
+        low_quality_pages = 0
 
         for page_num, page in enumerate(reader.pages):
             try:
@@ -18,32 +22,68 @@ class PDFLoader(BaseLoader):
                 text = None
 
             if text and text.strip():
-                documents.append(
-                    Document(
-                        content=text,
-                        metadata={
-                            "source": file_path,
-                            "page": page_num + 1,
-                            "ocr": False
-                        }
+                if self._looks_like_garbage_text(text):
+                    low_quality_pages += 1
+                else:
+                    documents.append(
+                        Document(
+                            content=text,
+                            metadata={
+                                "source": file_path,
+                                "page": page_num + 1,
+                                "ocr": False
+                            }
+                        )
                     )
-                )
+                    continue
             else:
                 empty_pages += 1
 
-        # If many pages have no selectable text → run OCR
-        if len(reader.pages) > 0 and empty_pages >= max(1, int(0.3 * len(reader.pages))):
-            print(f"[OCR] Detected scanned PDF: {file_path}. Running OCR...")
-            documents.extend(self._ocr_pdf(file_path))
+        should_run_ocr = self.force_ocr
+        if len(reader.pages) > 0 and not should_run_ocr:
+            weak_page_count = empty_pages + low_quality_pages
+            should_run_ocr = weak_page_count >= max(1, int(0.3 * len(reader.pages)))
+
+        if should_run_ocr:
+            reason = "force_ocr=True" if self.force_ocr else "weak extracted text detected"
+            print(f"[OCR] {reason} for: {file_path}. Running OCR...")
+            documents = self._ocr_pdf(file_path)
 
         return documents
+
+    def _looks_like_garbage_text(self, text: str) -> bool:
+        cleaned = " ".join(text.split())
+        if len(cleaned) < 40:
+            return True
+
+        meaningful_chars = 0
+        garbage_chars = 0
+
+        for char in cleaned:
+            if char.isspace():
+                continue
+
+            category = unicodedata.category(char)
+            if char.isalnum() or category.startswith("L") or category.startswith("N"):
+                meaningful_chars += 1
+            elif category.startswith("P"):
+                meaningful_chars += 1
+            elif category.startswith("S") or category.startswith("C"):
+                garbage_chars += 1
+
+        total_chars = meaningful_chars + garbage_chars
+        if total_chars == 0:
+            return True
+
+        garbage_ratio = garbage_chars / total_chars
+        return garbage_ratio > 0.3
 
     def _ocr_pdf(self, file_path: str) -> List[Document]:
         from pdf2image import convert_from_path
         import pytesseract
         import platform
 
-        # 🔧 Platform-specific paths
+        # Platform-specific paths
         if platform.system() == "Windows":
             # Explicit paths for Windows installation
             pytesseract.pytesseract.tesseract_cmd = r"D:\Tesseract\tesseract.exe"

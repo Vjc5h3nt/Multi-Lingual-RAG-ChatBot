@@ -144,51 +144,97 @@ st.markdown("""
 
 INDEX_PATH = "data/index/faiss.index"
 DOCS_PATH = "data/index/documents.pkl"
+RAW_DATA_DIR = "data/raw"
+INDEX_DIR = "data/index"
+
+
+def ensure_data_directories():
+    os.makedirs(RAW_DATA_DIR, exist_ok=True)
+    os.makedirs(INDEX_DIR, exist_ok=True)
+
+
+def clear_cached_rag():
+    st.cache_resource.clear()
+    st.session_state.pop("rag", None)
+
+
+def delete_vector_store_files():
+    removed_files = []
+    for path in (INDEX_PATH, DOCS_PATH):
+        if os.path.exists(path):
+            os.remove(path)
+            removed_files.append(path)
+    return removed_files
+
+
+def save_uploaded_pdfs(uploaded_files) -> List[str]:
+    ensure_data_directories()
+    saved_files = []
+
+    for uploaded_file in uploaded_files:
+        destination = os.path.join(RAW_DATA_DIR, uploaded_file.name)
+        with open(destination, "wb") as output_file:
+            output_file.write(uploaded_file.getbuffer())
+        saved_files.append(destination)
+
+    return saved_files
+
+
+def build_vector_store(show_progress: bool = False, force_ocr: bool = False):
+    ensure_data_directories()
+    embedder = BedrockEmbedder()
+    loader = PDFLoader(force_ocr=force_ocr)
+    chunker = TextChunker(chunk_size=200, overlap=20)
+
+    all_docs = []
+    pdf_files = glob.glob(os.path.join(RAW_DATA_DIR, "*.pdf"))
+
+    if not pdf_files:
+        raise FileNotFoundError("No PDF files found in data/raw folder")
+
+    progress_bar = None
+    status_text = None
+    if show_progress:
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+    for idx, file_path in enumerate(pdf_files):
+        if status_text is not None:
+            status_text.text(f"Loading: {os.path.basename(file_path)}")
+        all_docs.extend(loader.load(file_path))
+        if progress_bar is not None:
+            progress_bar.progress((idx + 1) / len(pdf_files))
+
+    if status_text is not None:
+        status_text.text("Creating chunks...")
+    chunks = chunker.chunk_documents(all_docs)
+
+    if status_text is not None:
+        status_text.text("Generating embeddings...")
+    embeddings = embedder.embed_documents(chunks)
+
+    vector_store = FaissVectorStore(embedding_dim=len(embeddings[0]))
+    vector_store.add_embeddings(embeddings, chunks)
+    vector_store.save(INDEX_PATH, DOCS_PATH)
+
+    if progress_bar is not None:
+        progress_bar.empty()
+    if status_text is not None:
+        status_text.empty()
+
+    return vector_store
 
 @st.cache_resource
-def load_vector_store():
+def load_vector_store(force_ocr: bool = False):
     """Load or build the FAISS vector store"""
-    embedder = BedrockEmbedder()
-    
+    ensure_data_directories()
+
     if os.path.exists(INDEX_PATH) and os.path.exists(DOCS_PATH):
         vector_store = FaissVectorStore(embedding_dim=1024)
         vector_store.load(INDEX_PATH, DOCS_PATH)
         return vector_store
-    else:
-        # Build index if not exists
-        loader = PDFLoader()
-        chunker = TextChunker(chunk_size=200, overlap=20)
-        
-        all_docs = []
-        pdf_files = glob.glob("data/raw/*.pdf")
-        
-        if not pdf_files:
-            st.error("No PDF files found in data/raw folder")
-            st.stop()
-        
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        for idx, file_path in enumerate(pdf_files):
-            status_text.text(f"Loading: {os.path.basename(file_path)}")
-            all_docs.extend(loader.load(file_path))
-            progress_bar.progress((idx + 1) / len(pdf_files))
-        
-        status_text.text("Creating chunks...")
-        chunks = chunker.chunk_documents(all_docs)
-        
-        status_text.text("Generating embeddings...")
-        embeddings = embedder.embed_documents(chunks)
-        
-        vector_store = FaissVectorStore(embedding_dim=len(embeddings[0]))
-        vector_store.add_embeddings(embeddings, chunks)
-        
-        vector_store.save(INDEX_PATH, DOCS_PATH)
-        
-        progress_bar.empty()
-        status_text.empty()
-        
-        return vector_store
+
+    return build_vector_store(show_progress=True, force_ocr=force_ocr)
 
 def get_answer_with_context(rag: RAGPipeline, question: str, top_k: int = 10, max_tokens: int = 500, temperature: float = 0.3) -> Tuple[str, List[Document]]:
     """Get answer and retrieved context"""
@@ -362,6 +408,54 @@ def main():
         """, unsafe_allow_html=True)
         
         st.markdown("---")
+
+        st.markdown("### 📚 Document Management")
+        force_ocr = st.checkbox(
+            "Force OCR during ingestion",
+            value=False,
+            help="Use OCR even when the PDF already contains an extracted text layer."
+        )
+        uploaded_files = st.file_uploader(
+            "Upload PDF documents",
+            type=["pdf"],
+            accept_multiple_files=True,
+            help="Uploaded PDFs are saved to data/raw and re-indexed into the vector database."
+        )
+
+        if st.button("📥 Upload & Ingest Documents", use_container_width=True):
+            if not uploaded_files:
+                st.warning("Select at least one PDF file to upload.")
+            else:
+                try:
+                    saved_files = save_uploaded_pdfs(uploaded_files)
+                    delete_vector_store_files()
+                    clear_cached_rag()
+                    with st.spinner("Uploading files and rebuilding the vector database..."):
+                        st.session_state.rag = RAGPipeline(
+                            build_vector_store(show_progress=True, force_ocr=force_ocr)
+                        )
+                    st.success(
+                        f"Uploaded {len(saved_files)} file(s) and rebuilt the vector database."
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Failed to upload and ingest documents: {exc}")
+
+        if st.button("🗑️ Delete Vector DB Data", use_container_width=True):
+            try:
+                removed_files = delete_vector_store_files()
+                clear_cached_rag()
+                if removed_files:
+                    st.success("Deleted the existing vector database files.")
+                else:
+                    st.info("No vector database files were present to delete.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Failed to delete vector database files: {exc}")
+
+        st.caption("Deleting the vector DB removes only indexed data in data/index. Source PDFs in data/raw are kept.")
+
+        st.markdown("---")
         
         # Toggle for showing context
         show_context = st.toggle("📄 Show Retrieved Context", value=False)
@@ -387,9 +481,13 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "rag" not in st.session_state:
-        with st.spinner("🔄 Loading vector store and initializing RAG pipeline..."):
-            vector_store = load_vector_store()
-            st.session_state.rag = RAGPipeline(vector_store)
+        try:
+            with st.spinner("🔄 Loading vector store and initializing RAG pipeline..."):
+                vector_store = load_vector_store(force_ocr=force_ocr)
+                st.session_state.rag = RAGPipeline(vector_store)
+        except FileNotFoundError:
+            st.info("Upload PDFs from the sidebar to build the knowledge base.")
+            st.stop()
     
     # Display chat history
     for message in st.session_state.messages:
