@@ -1,0 +1,71 @@
+import os
+import glob
+from app.loaders.pdf_loader import PDFLoader
+from app.chunker import TextChunker
+from app.embedder import BedrockEmbedder
+from app.vector_store import FaissVectorStore
+from app.rag_pipeline import RAGPipeline
+
+INDEX_PATH = "data/index/faiss.index"
+DOCS_PATH = "data/index/documents.pkl"
+
+def build_or_load_vector_store():
+    embedder = BedrockEmbedder()
+
+    if os.path.exists(INDEX_PATH) and os.path.exists(DOCS_PATH):
+        print("Loading existing FAISS index...")
+        vector_store = FaissVectorStore(embedding_dim=1024)
+        vector_store.load(INDEX_PATH, DOCS_PATH)
+    else:
+        print("Building FAISS index for the first time (this may take a few minutes)...")
+
+        loader = PDFLoader()
+        chunker = TextChunker(chunk_size=500, overlap=50)
+
+        all_docs = []
+        pdf_files = glob.glob("data/raw/*.pdf")
+
+        if not pdf_files:
+            raise Exception("No PDF files found in data/raw folder")
+
+        for file_path in pdf_files:
+            print(f"Loading: {file_path}")
+            all_docs.extend(loader.load(file_path))
+
+        print(f"Total pages loaded: {len(all_docs)}")
+
+        chunks = chunker.chunk_documents(all_docs)
+        print(f"Total chunks created: {len(chunks)}")
+
+        embeddings = embedder.embed_documents(chunks)
+
+        vector_store = FaissVectorStore(embedding_dim=len(embeddings[0]))
+        vector_store.add_embeddings(embeddings, chunks)
+
+        vector_store.save(INDEX_PATH, DOCS_PATH)
+        print("FAISS index built and saved successfully.")
+
+    return vector_store
+
+
+if __name__ == "__main__":
+
+    vector_store = build_or_load_vector_store()
+    rag = RAGPipeline(vector_store)
+
+    print("\nMultilingual RAG Chatbot is ready.")
+    print("Ask in any language (type 'exit' to quit)\n")
+
+    while True:
+        question = input("You: ").strip()
+
+        if question.lower() == "exit":
+            print("Goodbye!")
+            break
+
+        # Skip empty inputs
+        if not question:
+            continue
+
+        answer = rag.answer(question)
+        print("\nBot:", answer, "\n")
