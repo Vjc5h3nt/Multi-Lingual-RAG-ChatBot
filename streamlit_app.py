@@ -140,6 +140,23 @@ st.markdown("""
         color: #333;
         margin-top: 0.25rem;
     }
+
+    .stButton button {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.55rem;
+    }
+
+    div.element-container:has(.danger-btn) {
+        display: none;
+    }
+
+    div.element-container:has(.danger-btn) + div button:hover {
+        background-color: #fee2e2;
+        border-color: #fca5a5;
+        color: #b91c1c;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -223,6 +240,36 @@ def get_available_ocr_languages() -> List[str]:
 
 def format_ocr_language_option(code: str) -> str:
     return f"{OCR_LANGUAGE_LABELS.get(code, code)} ({code})"
+
+
+@st.dialog("Delete Vector Database")
+def confirm_delete_vector_db():
+    st.warning("This will delete the existing FAISS index and document metadata from data/index.")
+    confirmation_text = st.text_input(
+        "Type `delete` to confirm",
+        key="delete_vector_db_confirmation",
+        placeholder="delete",
+    )
+
+    confirm_col, cancel_col = st.columns(2)
+    with confirm_col:
+        confirm_clicked = st.button("Confirm Delete", use_container_width=True)
+    with cancel_col:
+        cancel_clicked = st.button("Cancel", use_container_width=True)
+
+    if confirm_clicked:
+        if confirmation_text.strip().lower() != "delete":
+            st.error("Type `delete` exactly to confirm.")
+        else:
+            removed_files = delete_vector_store_files()
+            clear_cached_rag()
+            st.session_state["vector_db_delete_result"] = removed_files
+            st.session_state["delete_vector_db_confirmation"] = ""
+            st.rerun()
+
+    if cancel_clicked:
+        st.session_state["delete_vector_db_confirmation"] = ""
+        st.rerun()
 
 
 def build_vector_store(
@@ -384,138 +431,138 @@ def main():
     # Header
     st.markdown("""
     <div class="title-container">
-        <h1> Multilingual RAG Chatbot 🤖</h1>
-        <p> Crafted by Perplex Squad with<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24" height="24" viewBox="0 0 48 48" style="vertical-align: middle; margin-left: 6px;">
-<path fill="#252f3e" d="M13.527,21.529c0,0.597,0.064,1.08,0.176,1.435c0.128,0.355,0.287,0.742,0.511,1.161 c0.08,0.129,0.112,0.258,0.112,0.371c0,0.161-0.096,0.322-0.303,0.484l-1.006,0.677c-0.144,0.097-0.287,0.145-0.415,0.145 c-0.16,0-0.319-0.081-0.479-0.226c-0.224-0.242-0.415-0.5-0.575-0.758c-0.16-0.274-0.319-0.58-0.495-0.951 c-1.245,1.483-2.81,2.225-4.694,2.225c-1.341,0-2.411-0.387-3.193-1.161s-1.181-1.806-1.181-3.096c0-1.37,0.479-2.483,1.453-3.321 s2.267-1.258,3.911-1.258c0.543,0,1.102,0.048,1.692,0.129s1.197,0.21,1.836,0.355v-1.177c0-1.225-0.255-2.08-0.75-2.58 c-0.511-0.5-1.373-0.742-2.602-0.742c-0.559,0-1.133,0.064-1.724,0.21c-0.591,0.145-1.165,0.322-1.724,0.548 c-0.255,0.113-0.447,0.177-0.559,0.21c-0.112,0.032-0.192,0.048-0.255,0.048c-0.224,0-0.335-0.161-0.335-0.5v-0.79 c0-0.258,0.032-0.451,0.112-0.564c0.08-0.113,0.224-0.226,0.447-0.339c0.559-0.29,1.229-0.532,2.012-0.726 c0.782-0.21,1.612-0.306,2.49-0.306c1.9,0,3.289,0.435,4.183,1.306c0.878,0.871,1.325,2.193,1.325,3.966v5.224H13.527z M7.045,23.979c0.527,0,1.07-0.097,1.644-0.29c0.575-0.193,1.086-0.548,1.517-1.032c0.255-0.306,0.447-0.645,0.543-1.032 c0.096-0.387,0.16-0.855,0.16-1.403v-0.677c-0.463-0.113-0.958-0.21-1.469-0.274c-0.511-0.064-1.006-0.097-1.501-0.097 c-1.07,0-1.852,0.21-2.379,0.645s-0.782,1.048-0.782,1.854c0,0.758,0.192,1.322,0.591,1.709 C5.752,23.786,6.311,23.979,7.045,23.979z M19.865,25.721c-0.287,0-0.479-0.048-0.607-0.161c-0.128-0.097-0.239-0.322-0.335-0.629 l-3.752-12.463c-0.096-0.322-0.144-0.532-0.144-0.645c0-0.258,0.128-0.403,0.383-0.403h1.565c0.303,0,0.511,0.048,0.623,0.161 c0.128,0.097,0.223,0.322,0.319,0.629l2.682,10.674l2.49-10.674c0.08-0.322,0.176-0.532,0.303-0.629 c0.128-0.097,0.351-0.161,0.639-0.161h1.277c0.303,0,0.511,0.048,0.639,0.161c0.128,0.097,0.239,0.322,0.303,0.629l2.522,10.803 l2.762-10.803c0.096-0.322,0.208-0.532,0.319-0.629c0.128-0.097,0.335-0.161,0.623-0.161h1.485c0.255,0,0.399,0.129,0.399,0.403 c0,0.081-0.016,0.161-0.032,0.258s-0.048,0.226-0.112,0.403l-3.847,12.463c-0.096,0.322-0.208,0.532-0.335,0.629 s-0.335,0.161-0.607,0.161h-1.373c-0.303,0-0.511-0.048-0.639-0.161c-0.128-0.113-0.239-0.322-0.303-0.645l-2.474-10.4 L22.18,24.915c-0.08,0.322-0.176,0.532-0.303,0.645c-0.128,0.113-0.351,0.161-0.639,0.161H19.865z M40.379,26.156 c-0.83,0-1.66-0.097-2.458-0.29c-0.798-0.193-1.421-0.403-1.836-0.645c-0.255-0.145-0.431-0.306-0.495-0.451 c-0.064-0.145-0.096-0.306-0.096-0.451v-0.822c0-0.339,0.128-0.5,0.367-0.5c0.096,0,0.192,0.016,0.287,0.048 c0.096,0.032,0.239,0.097,0.399,0.161c0.543,0.242,1.133,0.435,1.756,0.564c0.639,0.129,1.261,0.193,1.9,0.193 c1.006,0,1.788-0.177,2.331-0.532c0.543-0.355,0.83-0.871,0.83-1.532c0-0.451-0.144-0.822-0.431-1.129 c-0.287-0.306-0.83-0.58-1.612-0.838l-2.315-0.726c-1.165-0.371-2.027-0.919-2.554-1.645c-0.527-0.709-0.798-1.499-0.798-2.338 c0-0.677,0.144-1.274,0.431-1.79s0.671-0.967,1.149-1.322c0.479-0.371,1.022-0.645,1.66-0.838C39.533,11.081,40.203,11,40.906,11 c0.351,0,0.718,0.016,1.07,0.064c0.367,0.048,0.702,0.113,1.038,0.177c0.319,0.081,0.623,0.161,0.91,0.258s0.511,0.193,0.671,0.29 c0.224,0.129,0.383,0.258,0.479,0.403c0.096,0.129,0.144,0.306,0.144,0.532v0.758c0,0.339-0.128,0.516-0.367,0.516 c-0.128,0-0.335-0.064-0.607-0.193c-0.91-0.419-1.932-0.629-3.065-0.629c-0.91,0-1.628,0.145-2.123,0.451 c-0.495,0.306-0.75,0.774-0.75,1.435c0,0.451,0.16,0.838,0.479,1.145c0.319,0.306,0.91,0.613,1.756,0.887l2.267,0.726 c1.149,0.371,1.98,0.887,2.474,1.548s0.734,1.419,0.734,2.257c0,0.693-0.144,1.322-0.415,1.87 c-0.287,0.548-0.671,1.032-1.165,1.419c-0.495,0.403-1.086,0.693-1.772,0.903C41.943,26.043,41.193,26.156,40.379,26.156z"></path><path fill="#f90" d="M43.396,33.992c-5.252,3.918-12.883,5.998-19.445,5.998c-9.195,0-17.481-3.434-23.739-9.142 c-0.495-0.451-0.048-1.064,0.543-0.709c6.769,3.966,15.118,6.369,23.755,6.369c5.827,0,12.229-1.225,18.119-3.741 C43.508,32.364,44.258,33.347,43.396,33.992z M45.583,31.477c-0.671-0.871-4.438-0.419-6.146-0.21 c-0.511,0.064-0.591-0.387-0.128-0.726c3.001-2.128,7.934-1.516,8.509-0.806c0.575,0.726-0.16,5.708-2.969,8.094 c-0.431,0.371-0.846,0.177-0.655-0.306C44.833,35.927,46.254,32.331,45.583,31.477z"></path>
-</svg></p>
+        <h1> Multilingual RAG Chatbot <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 64 64" fill="none" style="vertical-align: middle; margin-left: 6px;"><circle cx="32" cy="32" r="30" fill="#38bdf8"/><rect x="16" y="18" width="32" height="24" rx="8" fill="#f8fafc"/><rect x="20" y="22" width="24" height="16" rx="5" fill="#111827"/><circle cx="26" cy="29" r="3" fill="#67e8f9"/><circle cx="38" cy="29" r="3" fill="#67e8f9"/><path d="M26 35c2 2 4 3 6 3s4-1 6-3" stroke="#5eead4" stroke-width="3" stroke-linecap="round"/><rect x="29" y="12" width="6" height="8" rx="3" fill="#f8fafc"/><circle cx="32" cy="10" r="3" fill="#f8fafc"/></svg></h1>
+        <p>Crafted by Perplex Squad</p>
     </div>
     """, unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
-        st.markdown("### 🔧 System Information")
-        
-        st.markdown("""
-        <div class="info-box">
-            <div class="info-label">LLM Model</div>
-            <div class="info-value">Claude 3.5 Sonnet</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### ⚙️ LLM Parameters & Recommended Settings 💡")
-        
-        # Temperature slider
-        temperature = st.slider(
-            "🌡️ Temperature",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.3,
-            step=0.1,
-            help="Controls randomness: 0.0 = deterministic, 1.0 = creative"
-        )
-        
-        # Max tokens slider
-        max_tokens = st.slider(
-            "📏 Max Tokens",
-            min_value=100,
-            max_value=4000,
-            value=500,
-            step=100,
-            help="Maximum length of the response"
-        )
-        
-        st.markdown(f"""
-        <div style="font-size: 0.85em; color: #888; margin-top: 10px;">
-            <b>Current Settings:</b><br/>
-            Temperature: {temperature}, Max Tokens: {max_tokens}<br/>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Recommended settings guide
-        # st.markdown("#### 💡 Recommended Settings")
-        st.markdown("""
-        <div style="font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #dee2e6;">
-                        <th style="text-align: left; padding: 5px;">Use Case</th>
-                        <th style="text-align: center; padding: 5px;">Temp</th>
-                        <th style="text-align: center; padding: 5px;">Tokens</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr style="border-bottom: 1px solid #dee2e6;">
-                        <td style="padding: 5px;">📚 Factual Q&A</td>
-                        <td style="text-align: center; padding: 5px;">0.0-0.3</td>
-                        <td style="text-align: center; padding: 5px;">500-1000</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #dee2e6;">
-                        <td style="padding: 5px;">📝 Summaries</td>
-                        <td style="text-align: center; padding: 5px;">0.3-0.5</td>
-                        <td style="text-align: center; padding: 5px;">1000-2000</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 5px;">🎨 Creative</td>
-                        <td style="text-align: center; padding: 5px;">0.7-1.0</td>
-                        <td style="text-align: center; padding: 5px;">1000-4000</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        st.markdown("""
-        <div class="info-box">
-            <div class="info-label">Embeddings</div>
-            <div class="info-value">Amazon Titan v2</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div class="info-box">
-            <div class="info-label">Vector Database</div>
-            <div class="info-value">FAISS</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div class="info-box">
-            <div class="info-label">Mode</div>
-            <div class="info-value">Multilingual RAG</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-
-        st.markdown("### 📚 Document Management")
-        force_ocr = st.checkbox(
-            "Force OCR during ingestion",
-            value=False,
-            help="Use OCR even when the PDF already contains an extracted text layer."
-        )
         available_ocr_languages = get_available_ocr_languages()
         default_ocr_languages = [
             code for code in DEFAULT_OCR_LANGUAGES if code in available_ocr_languages
         ] or available_ocr_languages[:3]
-        selected_ocr_languages = st.multiselect(
-            "OCR languages",
-            options=available_ocr_languages,
-            default=default_ocr_languages,
-            format_func=format_ocr_language_option,
-            help="These Tesseract languages are used only when OCR runs during ingestion."
-        )
-        uploaded_files = st.file_uploader(
-            "Upload PDF documents",
-            type=["pdf"],
-            accept_multiple_files=True,
-            help="Uploaded PDFs are saved to data/raw and re-indexed into the vector database."
-        )
+
+        with st.expander("Model Settings", expanded=False):
+            st.markdown("""
+            <div class="info-box">
+                <div class="info-label">LLM Model</div>
+                <div class="info-value">Claude 3.5 Sonnet</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            temperature = st.slider(
+                "🌡️ Temperature",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.3,
+                step=0.1,
+                help="Controls randomness: 0.0 = deterministic, 1.0 = creative"
+            )
+
+            max_tokens = st.slider(
+                "📏 Max Tokens",
+                min_value=100,
+                max_value=4000,
+                value=500,
+                step=100,
+                help="Maximum length of the response"
+            )
+
+            st.markdown(f"""
+            <div style="font-size: 0.85em; color: #888; margin-top: 10px;">
+                <b>Current Settings:</b><br/>
+                Temperature: {temperature}, Max Tokens: {max_tokens}<br/>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div style="font-size: 0.8em; background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #dee2e6;">
+                            <th style="text-align: left; padding: 5px;">Use Case</th>
+                            <th style="text-align: center; padding: 5px;">Temp</th>
+                            <th style="text-align: center; padding: 5px;">Tokens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 5px;">📚 Factual Q&A</td>
+                            <td style="text-align: center; padding: 5px;">0.0-0.3</td>
+                            <td style="text-align: center; padding: 5px;">500-1000</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 5px;">📝 Summaries</td>
+                            <td style="text-align: center; padding: 5px;">0.3-0.5</td>
+                            <td style="text-align: center; padding: 5px;">1000-2000</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px;">🎨 Creative</td>
+                            <td style="text-align: center; padding: 5px;">0.7-1.0</td>
+                            <td style="text-align: center; padding: 5px;">1000-4000</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with st.expander("Document Management", expanded=False):
+            uploaded_files = st.file_uploader(
+                "Upload PDFs",
+                type=["pdf"],
+                accept_multiple_files=True,
+                help="Uploaded PDFs are saved to data/raw and re-indexed into the vector database.",
+            )
+
+            upload_clicked = st.button("Upload & Index Documents", use_container_width=True, icon=":material/upload_file:")
+            reindex_clicked = st.button("Reindex Existing Documents", use_container_width=True, icon=":material/sync:")
+            st.markdown('<div class="danger-btn"></div>', unsafe_allow_html=True)
+            delete_clicked = st.button("Delete Vector Database", use_container_width=True, icon=":material/delete:")
+
+        with st.expander("Languages & OCR", expanded=False):
+            force_ocr = st.toggle(
+                "Enable OCR for scanned PDFs",
+                value=False,
+                help="Use OCR even when the PDF already contains an extracted text layer.",
+            )
+            selected_ocr_languages = st.multiselect(
+                "OCR languages",
+                options=available_ocr_languages,
+                default=default_ocr_languages,
+                format_func=format_ocr_language_option,
+                help="These Tesseract language packs are used only when OCR runs during ingestion.",
+            )
+
+        with st.expander("Debug Tools", expanded=False):
+            show_context = st.toggle("Show Retrieved Context", value=False)
+
+        with st.expander("System Info", expanded=False):
+            st.markdown(
+                """
+                <div class="info-box">
+                    <div class="info-label">Embeddings</div>
+                    <div class="info-value">• Amazon Titan v2</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Vector Database</div>
+                    <div class="info-value">• FAISS</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Mode</div>
+                    <div class="info-value">• Multilingual RAG</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        if st.button("Clear Chat History"):
+            st.session_state.messages = []
+            st.rerun()
+
         selected_ocr_languages_tuple = tuple(selected_ocr_languages or default_ocr_languages)
 
-        if st.button("📥 Upload & Ingest Documents", use_container_width=True):
+        if upload_clicked:
             if not uploaded_files:
                 st.warning("Select at least one PDF file to upload.")
             elif not selected_ocr_languages_tuple:
@@ -540,42 +587,32 @@ def main():
                 except Exception as exc:
                     st.error(f"Failed to upload and ingest documents: {exc}")
 
-        if st.button("🗑️ Delete Vector DB Data", use_container_width=True):
+        if reindex_clicked:
             try:
-                removed_files = delete_vector_store_files()
+                delete_vector_store_files()
                 clear_cached_rag()
-                if removed_files:
-                    st.success("Deleted the existing vector database files.")
-                else:
-                    st.info("No vector database files were present to delete.")
+                with st.spinner("Reindexing documents from data/raw..."):
+                    st.session_state.rag = RAGPipeline(
+                        build_vector_store(
+                            show_progress=True,
+                            force_ocr=force_ocr,
+                            ocr_languages=selected_ocr_languages_tuple,
+                        )
+                    )
+                st.success("Reindexed the existing documents successfully.")
                 st.rerun()
             except Exception as exc:
-                st.error(f"Failed to delete vector database files: {exc}")
+                st.error(f"Failed to reindex documents: {exc}")
 
-        st.caption("Deleting the vector DB removes only indexed data in data/index. Source PDFs in data/raw are kept.")
-        st.caption(
-            "OCR uses the selected Tesseract language packs when OCR is triggered or forced."
-        )
+        if delete_clicked:
+            confirm_delete_vector_db()
 
-        st.markdown("---")
-        
-        # Toggle for showing context
-        show_context = st.toggle("📄 Show Retrieved Context", value=False)
-        
-        st.markdown("---")
-        
-        st.markdown("### 🌍 Supported Languages")
-        st.markdown("""
-        - European languages such as English, French, German, Spanish, Portuguese, Italian, Russian, Ukrainian, and more
-        - Indian languages such as Hindi, Telugu, Tamil, and more
-        - Arabic and other widely used languages
-        """)
-        
-        st.markdown("---")
-        
-        if st.button("🗑️ Clear Chat History"):
-            st.session_state.messages = []
-            st.rerun()
+        if "vector_db_delete_result" in st.session_state:
+            removed_files = st.session_state.pop("vector_db_delete_result")
+            if removed_files:
+                st.success("Deleted the existing vector database files.")
+            else:
+                st.info("No vector database files were present to delete.")
     
     # Initialize session state
     if "messages" not in st.session_state:
