@@ -19,7 +19,7 @@ class RAGPipeline:
 
         retrieved_docs = self.vector_store.search(query_embedding, top_k=top_k)
 
-        # 🔍 DEBUG: Print retrieved chunks
+        # Debug logging for retrieved chunks
         print("\n--- Retrieved Chunks from Vector DB ---")
         for i, doc in enumerate(retrieved_docs, 1):
             src = doc.metadata.get("source")
@@ -45,7 +45,7 @@ FINAL LANGUAGE REQUIREMENT:
 - Do not answer in the Context language unless {target_language_label} is also the target language
 - If the Context is in another language, translate the relevant information into {target_language_label}
 
-⚠️ CRITICAL RULES:
+CRITICAL RULES:
 1. MULTILINGUAL CONTEXT HANDLING:
    - The Context below may be in ANY language, including major European languages plus Indian and other widely used languages
    - You MUST read, understand, and USE the Context regardless of what language it's written in
@@ -89,14 +89,14 @@ Step 6: Translate that information to the target language (from Step 1-2)
 Step 7: Provide the COMPLETE answer in the target language with native script
 
 EXAMPLES:
-✓ "Boy who cried wolf in French" → Full answer in Français
-✓ Question in हिंदी → Full answer in हिंदी (even if Context is in తెలుగు)
-✓ Question in English (no language request) → Full answer in English
-✓ User asks in Telugu → Full answer in Telugu unless another language is explicitly requested
-✓ Mixed question with mostly English text → Full answer in English unless another language is explicitly requested
-✓ Portuguese Question + Hindi Context → Full answer in Portuguese
-✓ Russian Question + English Context → Full answer in Russian
-✓ German Question + Hindi Context → Full answer in German
+- "Boy who cried wolf in French" -> Full answer in Francais
+- Question in हिंदी -> Full answer in हिंदी (even if Context is in తెలుగు)
+- Question in English (no language request) -> Full answer in English
+- User asks in Telugu -> Full answer in Telugu unless another language is explicitly requested
+- Mixed question with mostly English text -> Full answer in English unless another language is explicitly requested
+- Portuguese Question + Hindi Context -> Full answer in Portuguese
+- Russian Question + English Context -> Full answer in Russian
+- German Question + Hindi Context -> Full answer in German
 
 Context:
 {context}

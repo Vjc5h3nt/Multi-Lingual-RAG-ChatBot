@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: multi-lingual-rag-chatbot
+  title: Multi-Lingual RAG ChatBot
+  description: Streamlit-based multilingual RAG chatbot for querying PDF knowledge bases with FAISS and AWS Bedrock embeddings.
+  links:
+    - url: https://github.com/Vjc5h3nt/Multi-Lingual-RAG-ChatBot
+      title: Source Repository
+      icon: github
+    - url: https://github.com/Vjc5h3nt/Multi-Lingual-RAG-ChatBot/blob/main/README.md
+      title: README
+      icon: docs
+spec:
+  type: service
+  owner: user:default/manoharmallipudi
+  lifecycle: experimental

@@ -1,36 +1,36 @@
-.venv/
-__pycache__/
-*.pyc
 .env
-*.env
-index/
-data/raw/
-.vscode/
-/.idea/
-*.log
-dist/
-build/
-*.egg-info/# Environment variables
-.env
+.env.*
+!.env.example
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+.venv/
 venv/
 env/
 ENV/
 
-# IDE
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
 .DS_Store
 Thumbs.db
-create_and_push.ps1
+
+dist/
+build/
+*.egg-info/
+
+data/raw/
+data/index/
+index/
+
+*.log

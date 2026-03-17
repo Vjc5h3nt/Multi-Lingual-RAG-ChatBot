@@ -24,28 +24,18 @@ os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGSMITH_PROJECT", "multilingual-r
 # Page configuration
 st.set_page_config(
     page_title="Multilingual RAG Chatbot",
-    page_icon="🌐",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Fun loading messages (Slack-style)
+# Professional loading messages
 LOADING_MESSAGES = [
-    "🧠 Reading your mind...",
-    "🔍 Searching the knowledge base...",
-    "✨ Crafting the perfect answer...",
-    "🚀 Launching brain cells...",
-    "💡 Connecting the dots...",
-    "🎯 Hunting for answers...",
-    "🤖 Consulting the AI overlords...",
-    "📚 Flipping through pages...",
-    "🔮 Gazing into the crystal ball...",
-    "⚡ Charging up neurons...",
-    "🎨 Painting your answer...",
-    "🌟 Making magic happen...",
-    "🧩 Piecing it together...",
-    "🎪 Performing AI acrobatics...",
-    "🎭 Rehearsing the response...",
+    "Loading the knowledge base...",
+    "Retrieving relevant documents...",
+    "Preparing a grounded response...",
+    "Analyzing multilingual context...",
+    "Generating the final answer...",
+    "Processing retrieved passages...",
 ]
 
 # Custom CSS for modern, professional look
@@ -362,7 +352,7 @@ FINAL LANGUAGE REQUIREMENT:
 - Do not answer in the Context language unless {target_language_label} is also the target language
 - If the Context is in another language, translate the relevant information into {target_language_label}
 
-⚠️ CRITICAL RULES:
+CRITICAL RULES:
 1. MULTILINGUAL CONTEXT HANDLING:
    - The Context below may be in ANY language, including major European languages plus Indian and other widely used languages
    - You MUST read, understand, and USE the Context regardless of what language it's written in
@@ -406,14 +396,14 @@ Step 6: Translate that information to the target language (from Step 1-2)
 Step 7: Provide the COMPLETE answer in the target language with native script
 
 EXAMPLES:
-✓ "Boy who cried wolf in French" → Full answer in Français
-✓ Question in हिंदी → Full answer in हिंदी (even if Context is in తెలుగు)
-✓ Question in English (no language request) → Full answer in English
-✓ User asks in Telugu → Full answer in Telugu unless another language is explicitly requested
-✓ Mixed question with mostly English text → Full answer in English unless another language is explicitly requested
-✓ Portuguese Question + Hindi Context → Full answer in Portuguese
-✓ Russian Question + English Context → Full answer in Russian
-✓ German Question + Hindi Context → Full answer in German
+- "Boy who cried wolf in French" -> Full answer in Francais
+- Question in हिंदी -> Full answer in हिंदी (even if Context is in తెలుగు)
+- Question in English (no language request) -> Full answer in English
+- User asks in Telugu -> Full answer in Telugu unless another language is explicitly requested
+- Mixed question with mostly English text -> Full answer in English unless another language is explicitly requested
+- Portuguese Question + Hindi Context -> Full answer in Portuguese
+- Russian Question + English Context -> Full answer in Russian
+- German Question + Hindi Context -> Full answer in German
 
 Context:
 {context}
@@ -432,7 +422,7 @@ def main():
     st.markdown("""
     <div class="title-container">
         <h1> Multilingual RAG Chatbot <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 64 64" fill="none" style="vertical-align: middle; margin-left: 6px;"><circle cx="32" cy="32" r="30" fill="#38bdf8"/><rect x="16" y="18" width="32" height="24" rx="8" fill="#f8fafc"/><rect x="20" y="22" width="24" height="16" rx="5" fill="#111827"/><circle cx="26" cy="29" r="3" fill="#67e8f9"/><circle cx="38" cy="29" r="3" fill="#67e8f9"/><path d="M26 35c2 2 4 3 6 3s4-1 6-3" stroke="#5eead4" stroke-width="3" stroke-linecap="round"/><rect x="29" y="12" width="6" height="8" rx="3" fill="#f8fafc"/><circle cx="32" cy="10" r="3" fill="#f8fafc"/></svg></h1>
-        <p>Crafted by Perplex Squad</p>
+        <p>Document-grounded multilingual question answering</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -452,7 +442,7 @@ def main():
             """, unsafe_allow_html=True)
 
             temperature = st.slider(
-                "🌡️ Temperature",
+                "Temperature",
                 min_value=0.0,
                 max_value=1.0,
                 value=0.3,
@@ -461,7 +451,7 @@ def main():
             )
 
             max_tokens = st.slider(
-                "📏 Max Tokens",
+                "Max Tokens",
                 min_value=100,
                 max_value=4000,
                 value=500,
@@ -488,17 +478,17 @@ def main():
                     </thead>
                     <tbody>
                         <tr style="border-bottom: 1px solid #dee2e6;">
-                            <td style="padding: 5px;">📚 Factual Q&A</td>
+                            <td style="padding: 5px;">Factual Q&A</td>
                             <td style="text-align: center; padding: 5px;">0.0-0.3</td>
                             <td style="text-align: center; padding: 5px;">500-1000</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #dee2e6;">
-                            <td style="padding: 5px;">📝 Summaries</td>
+                            <td style="padding: 5px;">Summaries</td>
                             <td style="text-align: center; padding: 5px;">0.3-0.5</td>
                             <td style="text-align: center; padding: 5px;">1000-2000</td>
                         </tr>
                         <tr>
-                            <td style="padding: 5px;">🎨 Creative</td>
+                            <td style="padding: 5px;">Creative</td>
                             <td style="text-align: center; padding: 5px;">0.7-1.0</td>
                             <td style="text-align: center; padding: 5px;">1000-4000</td>
                         </tr>
@@ -619,7 +609,7 @@ def main():
         st.session_state.messages = []
     if "rag" not in st.session_state:
         try:
-            with st.spinner("🔄 Loading vector store and initializing RAG pipeline..."):
+            with st.spinner("Loading vector store and initializing the RAG pipeline..."):
                 vector_store = load_vector_store(
                     force_ocr=force_ocr,
                     ocr_languages=selected_ocr_languages_tuple,
@@ -631,8 +621,7 @@ def main():
     
     # Display chat history
     for message in st.session_state.messages:
-        avatar = "👤" if message["role"] == "user" else "🤖"
-        with st.chat_message(message["role"], avatar=avatar):
+        with st.chat_message(message["role"]):
             st.markdown(message["content"])
             
             # Show usage metadata if available for assistant messages
@@ -640,7 +629,7 @@ def main():
                 usage = message["usage"]
                 st.markdown(f"""
                 <div style="font-size: 0.75em; color: #888; margin-top: 15px; padding: 8px; background-color: #f0f0f0; border-radius: 5px;">
-                    <b>📊 Generation Stats:</b> 
+                    <b>Generation Stats:</b> 
                     Temperature: {usage['temperature']} | 
                     Tokens: {usage['output_tokens']} / {usage['max_tokens']} | 
                     Total: {usage['total_tokens']} (Input: {usage['input_tokens']})
@@ -649,7 +638,7 @@ def main():
             
             # Show context if available and toggle is on
             if show_context and message["role"] == "assistant" and "context" in message:
-                with st.expander("📚 Retrieved Context Chunks"):
+                with st.expander("Retrieved Context Chunks"):
                     for i, doc in enumerate(message["context"], 1):
                         source = doc.metadata.get("source", "Unknown")
                         page = doc.metadata.get("page", "?")
@@ -658,22 +647,22 @@ def main():
                         st.markdown(f"""
                         <div class="context-card">
                             <div class="context-meta">
-                                📄 Chunk {i} | Source: {os.path.basename(source)} | Page: {page} | OCR: {ocr}
+                                Chunk {i} | Source: {os.path.basename(source)} | Page: {page} | OCR: {ocr}
                             </div>
                             <div>{doc.content[:500]}{'...' if len(doc.content) > 500 else ''}</div>
                         </div>
                         """, unsafe_allow_html=True)
     
     # Chat input
-    if prompt := st.chat_input("🤗 Ask your question in any language. Let's go!"):
+    if prompt := st.chat_input("Ask a question in any supported language."):
         # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        with st.chat_message("user", avatar="👤"):
+        with st.chat_message("user"):
             st.markdown(prompt)
         
         # Generate response
-        with st.chat_message("assistant", avatar="🤖"):
+        with st.chat_message("assistant"):
             # Pick a random loading message
             loading_message = random.choice(LOADING_MESSAGES)
             with st.spinner(loading_message):
@@ -691,7 +680,7 @@ def main():
                     # Display token usage metadata
                     st.markdown(f"""
                     <div style="font-size: 0.75em; color: #888; margin-top: 15px; padding: 8px; background-color: #f0f0f0; border-radius: 5px;">
-                        <b>📊 Generation Stats:</b> 
+                        <b>Generation Stats:</b> 
                         Temperature: {usage_metadata['temperature']} | 
                         Tokens: {usage_metadata['output_tokens']} / {usage_metadata['max_tokens']} | 
                         Total: {usage_metadata['total_tokens']} (Input: {usage_metadata['input_tokens']})
@@ -708,7 +697,7 @@ def main():
                     
                     # Show context if toggle is on
                     if show_context:
-                        with st.expander("📚 Retrieved Context Chunks"):
+                        with st.expander("Retrieved Context Chunks"):
                             for i, doc in enumerate(context_docs, 1):
                                 source = doc.metadata.get("source", "Unknown")
                                 page = doc.metadata.get("page", "?")
@@ -717,14 +706,14 @@ def main():
                                 st.markdown(f"""
                                 <div class="context-card">
                                     <div class="context-meta">
-                                        📄 Chunk {i} | Source: {os.path.basename(source)} | Page: {page} | OCR: {ocr}
+                                        Chunk {i} | Source: {os.path.basename(source)} | Page: {page} | OCR: {ocr}
                                     </div>
                                     <div>{doc.content[:500]}{'...' if len(doc.content) > 500 else ''}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
                     
                 except Exception as e:
-                    error_msg = f"❌ Error: {str(e)}"
+                    error_msg = f"Error: {str(e)}"
                     st.error(error_msg)
                     st.session_state.messages.append({
                         "role": "assistant", 

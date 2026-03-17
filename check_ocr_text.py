@@ -3,7 +3,7 @@ from app.loaders.pdf_loader import PDFLoader
 
 loader = PDFLoader()
 
-# 🔎 Put Telugu text INSIDE quotes
+# Put Telugu text inside quotes.
 needle = "అపకారికి ఉపకారం చేయరాదు"
 
 for pdf in glob.glob("data/raw/*.pdf"):
