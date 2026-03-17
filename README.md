@@ -160,12 +160,18 @@ Supported OCR language defaults include:
 
 ## Language Handling
 
-The response language is determined from the user question, not from the retrieved context. The application:
+The response language is resolved from the user query in code before the final prompt is sent to the model. The application:
 
-- respects explicit requests such as "answer in French"
-- otherwise detects the dominant language of the input
+- respects explicit requests such as "answer in French" or "reply in Hindi"
+- otherwise detects the dominant language of the user input
+- prevents retrieved document language from overriding the chosen response language
 - uses retrieved context as the only factual basis for the answer
-- translates grounded information into the chosen response language when needed
+- translates grounded information into the selected response language when needed
+
+This separation is important in multilingual RAG because source documents and user questions may be in different languages. The system therefore treats:
+
+- query language selection as an application-level decision
+- context language as source material to retrieve and translate from when necessary
 
 ## Observability
 
