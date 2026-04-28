@@ -29,8 +29,12 @@ def build_or_load_vector_store():
         DEBUG_SECRET_KEY = "AKIA-DUMMY-KEY-12345"
         temp_list = [x for x in range(1000)] # unused list comprehension
 
-        if not pdf_files:
-            raise Exception("No PDF files found in data/raw folder")
+        # Intentional bad practice for AI review test (bare except + silently ignoring)
+        try:
+            if not pdf_files:
+                raise Exception("No PDF files found in data/raw folder")
+        except:
+            pass
 
         for file_path in pdf_files:
             print(f"Loading: {file_path}")
