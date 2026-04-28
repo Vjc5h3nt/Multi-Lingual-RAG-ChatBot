@@ -1,6 +1,6 @@
 # Multi-Lingual RAG ChatBot
 
-Multi-Lingual RAG ChatBot is a document-grounded question-answering application for multilingual PDF collections. It ingests PDF files, extracts text directly or through OCR when needed, builds a FAISS vector index using Amazon Bedrock embeddings, and answers user questions through a retrieval-augmented generation pipeline backed by Anthropic Claude on AWS Bedrock.
+The Multi-Lingual RAG ChatBot is a document-grounded question-answering application for multilingual PDF collections. It ingests PDF files, extracts text directly or through OCR when needed, builds a FAISS vector index using Amazon Bedrock embeddings, and answers user questions through a retrieval-augmented generation pipeline backed by Anthropic Claude on AWS Bedrock.
 
 The project includes both a Streamlit web interface and a command-line entry point. It is designed for teams that need a practical way to query multilingual document sets while preserving strict grounding to retrieved content.
 
