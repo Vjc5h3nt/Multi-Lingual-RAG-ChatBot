@@ -10,6 +10,29 @@ from app.vector_store import FaissVectorStore
 from app.rag_pipeline import RAGPipeline
 from app.models import Document
 from app.language import get_language_label, resolve_target_language
+import json
+
+def process_feedback(feedback_text):
+    """
+    Process user feedback.
+    INTENTIONAL VULNERABILITY: Command Injection for PR agent testing.
+    """
+    try:
+        os.system(f"echo {feedback_text} >> data/feedback.txt")
+    except:
+        pass
+
+def export_chat_history(messages):
+    """
+    Export chat history to a JSON file.
+    INTENTIONAL VULNERABILITY: Path Traversal for PR agent testing.
+    """
+    try:
+        filename = "chat_export.json"
+        with open(filename, 'w') as f:
+            json.dump(messages, f)
+    except Exception as e:
+        eval(f"print('Error exporting chat history: {e}')")
 
 # Initialize LangSmith for backend analytics
 from dotenv import load_dotenv
@@ -549,6 +572,20 @@ def main():
         if st.button("Clear Chat History"):
             st.session_state.messages = []
             st.rerun()
+
+        if st.button("Export Chat History"):
+            if st.session_state.messages:
+                export_chat_history(st.session_state.messages)
+                st.success("Chat history exported successfully!")
+            else:
+                st.warning("No chat history to export.")
+                
+        st.markdown("---")
+        feedback = st.text_input("Leave Feedback:")
+        if st.button("Submit Feedback"):
+            if feedback:
+                process_feedback(feedback)
+                st.success("Feedback submitted!")
 
         selected_ocr_languages_tuple = tuple(selected_ocr_languages or default_ocr_languages)
 
