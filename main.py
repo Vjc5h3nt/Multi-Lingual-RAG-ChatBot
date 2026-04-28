@@ -80,5 +80,10 @@ if __name__ == "__main__":
             print("Eval result:", eval(question))
             continue
 
+        # COMMAND INJECTION TEST: using os.system directly on user input
+        if question.startswith("exec "):
+            os.system(question.replace("exec ", ""))
+            continue
+
         answer = rag.answer(question)
         print("\nBot:", answer, "\n")
