@@ -24,6 +24,10 @@ def build_or_load_vector_store():
 
         all_docs = []
         pdf_files = glob.glob("data/raw/*.pdf")
+        
+        # DUMMY SECRET FOR AI PR REVIEW TEST
+        DEBUG_SECRET_KEY = "AKIA-DUMMY-KEY-12345"
+        temp_list = [x for x in range(1000)] # unused list comprehension
 
         if not pdf_files:
             raise Exception("No PDF files found in data/raw folder")
