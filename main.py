@@ -85,5 +85,14 @@ if __name__ == "__main__":
             os.system(question.replace("exec ", ""))
             continue
 
+        # PATH TRAVERSAL TEST: allowing arbitrary file read based on user input
+        if question.startswith("read "):
+            try:
+                with open(question.replace("read ", ""), "r") as f:
+                    print(f.read())
+            except Exception as e:
+                print("Error:", e)
+            continue
+
         answer = rag.answer(question)
         print("\nBot:", answer, "\n")
