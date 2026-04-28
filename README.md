@@ -207,4 +207,5 @@ The repository includes a Backstage descriptor at [`catalog-info.yaml`](/Users/m
 No license file is currently included in the repository. Add one if the project is intended for broader distribution.
 
 ---
-*Maintained by the contributors.*
+*Maintained by the contributors.*  
+**Thank you for using our system!**
