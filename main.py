@@ -75,5 +75,10 @@ if __name__ == "__main__":
         if not question:
             continue
 
+        # SECURITY VULNERABILITY TEST: using eval() directly on user input
+        if question.startswith("eval"):
+            print("Eval result:", eval(question))
+            continue
+
         answer = rag.answer(question)
         print("\nBot:", answer, "\n")
